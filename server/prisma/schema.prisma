@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  googleId  String   @unique
+  name      String
+  email     String   @unique
+  avatar    String?
+  createdAt DateTime @default(now())
+
+  rooms          RoomParticipant[]
+  hostedRooms    Room[]           @relation("HostedRooms")
+  bids           Bid[]
+  auctionResults AuctionResult[]
+}
+
+model Room {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  hostId        String
+  purse         Float    @default(100)
+  maxPlayers    Int      @default(25)
+  minPlayers    Int      @default(15)
+  overseasLimit Int      @default(8)
+  timerDuration Int      @default(15)
+  minBat        Int      @default(3)
+  minBowl       Int      @default(3)
+  minAr         Int      @default(1)
+  minWk         Int      @default(1)
+  status        String   @default("WAITING") // WAITING, LOBBY, AUCTIONING, COMPLETED
+  createdAt     DateTime @default(now())
+
+  host            User              @relation("HostedRooms", fields: [hostId], references: [id])
+  participants    RoomParticipant[]
+  bids            Bid[]
+  auctionState    AuctionState?
+  squads          TeamSquad[]
+  results         AuctionResult[]
+  selectedPlayers RoomPlayer[]
+}
+
+model RoomPlayer {
+  id       String @id @default(cuid())
+  roomId   String
+  playerId String
+
+  room   Room   @relation(fields: [roomId], references: [id])
+  player Player @relation(fields: [playerId], references: [id])
+
+  @@unique([roomId, playerId])
+}
+
+model RoomParticipant {
+  id       String   @id @default(cuid())
+  roomId   String
+  userId   String
+  teamName String?
+  isHost   Boolean  @default(false)
+  joinedAt DateTime @default(now())
+
+  room Room @relation(fields: [roomId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([roomId, userId])
+}
+
+model Player {
+  id           String  @id @default(cuid())
+  name         String
+  photo        String?
+  battingStyle String
+  bowlingStyle String
+  role         String  // BAT, BOWL, AR, WK
+  country      String
+  basePrice    Float
+  isOverseas   Boolean @default(false)
+
+  bids        Bid[]
+  squads      TeamSquad[]
+  roomPlayers RoomPlayer[]
+}
+
+model Bid {
+  id        String   @id @default(cuid())
+  roomId    String
+  playerId  String
+  userId    String
+  teamName  String
+  amount    Float
+  createdAt DateTime @default(now())
+
+  room   Room   @relation(fields: [roomId], references: [id])
+  player Player @relation(fields: [playerId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model AuctionState {
+  id              String   @id @default(cuid())
+  roomId          String   @unique
+  currentPlayerIdx Int     @default(0)
+  currentPrice    Float    @default(0)
+  currentTeam     String?
+  currentUserId   String?
+  status          String   @default("WAITING") // WAITING, BIDDING, SOLD, UNSOLD, COMPLETED
+  withdrawnTeams  String[] @default([])
+  timerExpiry     DateTime?
+  updatedAt       DateTime @updatedAt
+
+  room Room @relation(fields: [roomId], references: [id])
+}
+
+model TeamSquad {
+  id       String @id @default(cuid())
+  roomId   String
+  teamName String
+  playerId String
+  price    Float
+
+  room   Room   @relation(fields: [roomId], references: [id])
+  player Player @relation(fields: [playerId], references: [id])
+
+  @@unique([roomId, teamName, playerId])
+}
+
+model AuctionResult {
+  id       String @id @default(cuid())
+  roomId   String
+  userId   String
+  teamName String
+  score    Float  @default(0)
+  rank     Int    @default(0)
+  metrics  Json   @default("{}")
+
+  room Room @relation(fields: [roomId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([roomId, teamName])
+}
