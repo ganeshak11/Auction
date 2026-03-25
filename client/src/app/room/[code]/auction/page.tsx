@@ -28,6 +28,7 @@ interface AuctionState {
   currentTeam: string | null;
   status: string;
   withdrawnTeams: string[];
+  skippedTeams: string[];
   teamPurses: Record<string, number>;
   timerExpiry?: string;
 }
@@ -182,6 +183,12 @@ export default function AuctionPage() {
     socket.emit(SOCKET_EVENTS.WITHDRAW, { roomId: room.id });
   };
 
+  const handleSkip = () => {
+    if (!token || !room) return;
+    const socket = connectSocket(token);
+    socket.emit(SOCKET_EVENTS.SKIP, { roomId: room.id });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center gradient-bg">
@@ -197,6 +204,7 @@ export default function AuctionPage() {
 
   const currentPlayer = auctionState?.currentPlayer;
   const isWithdrawn = myTeam ? auctionState?.withdrawnTeams?.includes(myTeam) : false;
+  const isSkipped = myTeam ? auctionState?.skippedTeams?.includes(myTeam) : false;
   const myPurse = myTeam ? (auctionState?.teamPurses?.[myTeam] || 0) : 0;
   const isMyBid = auctionState?.currentTeam === myTeam;
 
@@ -298,7 +306,7 @@ export default function AuctionPage() {
                             {ROLE_LABELS[currentPlayer.role] || currentPlayer.role}
                           </span>
                           <span className="text-sm">
-                            {currentPlayer.isOverseas ? '🌍' : '🇮🇳'} {currentPlayer.country}
+                            {currentPlayer.isOverseas ? '✈️' : '🇮🇳'} {currentPlayer.country}
                           </span>
                         </div>
                       </div>
@@ -355,7 +363,8 @@ export default function AuctionPage() {
             {/* Bid Controls */}
             {auctionState?.status === 'BIDDING' && myTeam && (() => {
               const isFirstBid = !auctionState?.currentTeam; // No one has bid yet
-              const canBid = !isMyBid && !isWithdrawn;
+              // Withdraw is permanent, skip is temporary (cleared when someone bids)
+              const canBid = !isMyBid && !isWithdrawn && !(isSkipped && isFirstBid);
 
               return (
                 <div className="glass-card fade-in">
@@ -374,11 +383,11 @@ export default function AuctionPage() {
                         <div className="h-8 w-px bg-surface-lighter mx-2" />
 
                         <button
-                          onClick={handleWithdraw}
-                          disabled={isWithdrawn}
+                          onClick={handleSkip}
+                          disabled={isSkipped || isWithdrawn}
                           className="bid-btn bid-btn-withdraw"
                         >
-                          {isWithdrawn ? '✗ Skipped' : '⏭ Skip'}
+                          {isSkipped ? '✗ Skipped' : '⏭ Skip'}
                         </button>
                       </>
                     ) : (
@@ -426,7 +435,13 @@ export default function AuctionPage() {
 
                     {isWithdrawn && !isMyBid && (
                       <span className="ml-auto text-text-muted text-sm">
-                        {isFirstBid ? 'Skipped this player' : 'Withdrawn from this player'}
+                        Withdrawn from this player
+                      </span>
+                    )}
+
+                    {isSkipped && isFirstBid && !isMyBid && (
+                      <span className="ml-auto text-text-muted text-sm">
+                        Skipped — you'll be back if someone bids
                       </span>
                     )}
                   </div>
@@ -465,7 +480,7 @@ export default function AuctionPage() {
             </div>
           </div>
 
-          {/* Right sidebar - Squad Summary + Team Purses */}
+          {/* Right sidebar - Squad Summary + Team Purses + All Players */}
           <div className="space-y-6">
             {/* Team Purses */}
             <div className="glass-card fade-in">
@@ -504,7 +519,7 @@ export default function AuctionPage() {
                       <div className="flex items-center gap-2">
                         <span
                           className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: ROLE_COLORS[s.player?.role] || '#6366f1' }}
+                          style={{ backgroundColor: ROLE_COLORS[s.player?.role] || '#6366F1' }}
                         />
                         <span className="font-medium truncate">{s.player?.name}</span>
                       </div>
@@ -529,6 +544,58 @@ export default function AuctionPage() {
                       );
                     })}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* All Team Squads */}
+            {Object.keys(squads).length > 0 && (
+              <div className="glass-card fade-in">
+                <h3 className="text-sm font-bold text-text-muted mb-3 uppercase tracking-wider">
+                  Team Squads
+                </h3>
+                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
+                  {Object.entries(squads)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([teamName, members]) => {
+                      if (!members || members.length === 0) return null;
+                      return (
+                        <div key={teamName}>
+                          <h4 className="text-xs font-bold uppercase tracking-wider mb-2 px-1 flex items-center gap-1.5">
+                            <span>{TEAM_LOGOS[teamName] || '🏏'}</span>
+                            <span>{teamName}</span>
+                            <span className="text-text-muted font-normal">({members.length})</span>
+                          </h4>
+                          {(['BAT', 'WK', 'AR', 'BOWL'] as const).map(role => {
+                            const rolePlayers = members.filter((s: any) => s.player?.role === role);
+                            if (rolePlayers.length === 0) return null;
+                            return (
+                              <div key={role} className="mb-2">
+                                <p
+                                  className="text-[10px] font-bold uppercase tracking-wider mb-1 px-2"
+                                  style={{ color: ROLE_COLORS[role] }}
+                                >
+                                  {ROLE_LABELS[role]}
+                                </p>
+                                <div className="space-y-1">
+                                  {rolePlayers.map((s: any, i: number) => (
+                                    <div key={i} className="flex items-center justify-between py-1 px-2 rounded-lg bg-bg-light text-xs">
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        {s.player?.isOverseas && <span className="text-xs">✈️</span>}
+                                        <span className="font-medium truncate">{s.player?.name}</span>
+                                      </div>
+                                      <span className="text-[10px] font-mono text-accent shrink-0 ml-2">
+                                        {formatPrice(s.price)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             )}

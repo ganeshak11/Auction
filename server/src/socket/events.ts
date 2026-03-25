@@ -4,6 +4,7 @@ export const SOCKET_EVENTS = {
   START_AUCTION: 'start_auction',
   PLACE_BID: 'place_bid',
   WITHDRAW: 'withdraw',
+  SKIP: 'skip',
   NEXT_PLAYER: 'next_player',
 
   // Server → Client
@@ -32,5 +33,9 @@ export interface StartAuctionPayload {
 }
 
 export interface WithdrawPayload {
+  roomId: string;
+}
+
+export interface SkipPayload {
   roomId: string;
 }

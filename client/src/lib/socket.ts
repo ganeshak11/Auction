@@ -35,6 +35,7 @@ export const SOCKET_EVENTS = {
   START_AUCTION: 'start_auction',
   PLACE_BID: 'place_bid',
   WITHDRAW: 'withdraw',
+  SKIP: 'skip',
   ROOM_UPDATE: 'room_update',
   AUCTION_STATE: 'auction_state',
   BID_PLACED: 'bid_placed',

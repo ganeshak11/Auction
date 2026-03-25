@@ -6,6 +6,11 @@ const prisma = new PrismaClient();
 async function seed() {
   console.log('🌱 Seeding players...');
 
+  // Clear dependent tables first to avoid FK constraint violations
+  await prisma.roomPlayer.deleteMany();
+  await prisma.teamSquad.deleteMany();
+  await prisma.bid.deleteMany();
+
   // Clear existing players
   await prisma.player.deleteMany();
 

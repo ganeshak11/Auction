@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../index';
-import { SOCKET_EVENTS, JoinRoomPayload, PlaceBidPayload, StartAuctionPayload, WithdrawPayload } from './events';
+import { SOCKET_EVENTS, JoinRoomPayload, PlaceBidPayload, StartAuctionPayload, WithdrawPayload, SkipPayload } from './events';
 import { AuctionEngine } from '../engine/auctionEngine';
 
 // Map roomId → AuctionEngine instance
@@ -170,6 +170,26 @@ export function setupSocketHandlers(io: Server) {
         engine.withdraw(teamName);
       } catch (error: any) {
         socket.emit(SOCKET_EVENTS.ERROR, { message: error.message || 'Withdraw failed' });
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.SKIP, async (payload: SkipPayload) => {
+      try {
+        const engine = engines.get(payload.roomId);
+        if (!engine) {
+          socket.emit(SOCKET_EVENTS.ERROR, { message: 'Auction not active' });
+          return;
+        }
+
+        const teamName = (socket as any).teamName;
+        if (!teamName) {
+          socket.emit(SOCKET_EVENTS.ERROR, { message: 'No team assigned' });
+          return;
+        }
+
+        engine.skip(teamName);
+      } catch (error: any) {
+        socket.emit(SOCKET_EVENTS.ERROR, { message: error.message || 'Skip failed' });
       }
     });
 

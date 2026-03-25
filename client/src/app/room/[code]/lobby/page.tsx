@@ -230,7 +230,7 @@ export default function LobbyPage() {
                 <div className="flex items-center gap-3">
                   {p.teamName ? (
                     <div className={`team-${p.teamName} px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-2`}
-                      style={{ background: `var(--team-color, #6366f1)20`, borderLeft: `3px solid var(--team-color, #6366f1)` }}>
+                      style={{ background: `var(--team-color, #6366F1)20`, borderLeft: `3px solid var(--team-color, #6366F1)` }}>
                       <span>{TEAM_LOGOS[p.teamName] || '🏏'}</span>
                       <span>{p.teamName}</span>
                     </div>
@@ -279,7 +279,7 @@ export default function LobbyPage() {
             )}
             {(!room?.selectedPlayers || room.selectedPlayers.length === 0) && (
               <p className="text-accent text-sm mt-3">
-                💡 No players selected — all {93} seeded players will be used. Click "Select Players" to customize.
+                💡 No players selected — all {252} seeded players will be used. Click "Select Players" to customize.
               </p>
             )}
 

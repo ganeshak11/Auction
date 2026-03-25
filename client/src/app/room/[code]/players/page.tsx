@@ -171,7 +171,7 @@ export default function PlayerSelectionPage() {
                 </span>
               ))}
               <span className="px-2 py-1 rounded-full bg-surface-lighter text-text-muted">
-                🌍 {overseasCount}
+                ✈️ {overseasCount}
               </span>
             </div>
             <div className="text-right">
@@ -271,7 +271,7 @@ export default function PlayerSelectionPage() {
                       >
                         {player.role}
                       </span>
-                      <span>{player.isOverseas ? '🌍' : '🇮🇳'}</span>
+                      <span>{player.isOverseas ? '✈️' : '🇮🇳'}</span>
                       <span className="truncate">{player.country}</span>
                     </div>
                   </div>

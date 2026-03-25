@@ -16,6 +16,7 @@ interface AuctionStateLocal {
   currentUserId: string | null;
   status: 'WAITING' | 'BIDDING' | 'SOLD' | 'UNSOLD' | 'COMPLETED';
   withdrawnTeams: string[];
+  skippedTeams: string[];
   timerExpiry: Date | null;
   soldPlayers: Map<string, { teamName: string; price: number }>;
   unsoldPlayers: Set<string>;
@@ -41,6 +42,7 @@ export class AuctionEngine {
       currentUserId: null,
       status: 'WAITING',
       withdrawnTeams: [],
+      skippedTeams: [],
       timerExpiry: null,
       soldPlayers: new Map(),
       unsoldPlayers: new Set(),
@@ -67,6 +69,7 @@ export class AuctionEngine {
     this.state.currentTeam = null;
     this.state.currentUserId = null;
     this.state.withdrawnTeams = [];
+    this.state.skippedTeams = [];
 
     this.startTimer();
     this.broadcastState();
@@ -197,6 +200,9 @@ export class AuctionEngine {
     this.state.currentTeam = teamName;
     this.state.currentUserId = userId;
 
+    // Clear all skipped teams so they can bid again
+    this.state.skippedTeams = [];
+
     // Record bid
     await prisma.bid.create({
       data: {
@@ -230,23 +236,38 @@ export class AuctionEngine {
 
     if (!this.state.withdrawnTeams.includes(teamName)) {
       this.state.withdrawnTeams.push(teamName);
+      // Also remove from skipped if they were skipped before
+      this.state.skippedTeams = this.state.skippedTeams.filter(t => t !== teamName);
       this.broadcastState();
 
       // Check if all teams have withdrawn/skipped
-      this.checkAllWithdrawn();
+      this.checkAllInactive();
     }
   }
 
-  private checkAllWithdrawn() {
+  skip(teamName: string) {
+    if (this.state.status !== 'BIDDING') {
+      throw new Error('Auction not in bidding state');
+    }
+
+    if (!this.state.skippedTeams.includes(teamName) && !this.state.withdrawnTeams.includes(teamName)) {
+      this.state.skippedTeams.push(teamName);
+      this.broadcastState();
+
+      // Check if all teams have skipped/withdrawn
+      this.checkAllInactive();
+    }
+  }
+
+  private checkAllInactive() {
     const allTeams = this.room.participants
       .map(p => p.teamName)
       .filter(Boolean) as string[];
 
-    // Count teams that can still bid:
-    // - not withdrawn
-    // - not the current highest bidder (they can't bid again anyway)
+    // Teams that are still active (not withdrawn, not skipped, and not the current highest bidder)
     const activeTeams = allTeams.filter(team =>
       !this.state.withdrawnTeams.includes(team) &&
+      !this.state.skippedTeams.includes(team) &&
       team !== this.state.currentTeam
     );
 
@@ -311,6 +332,7 @@ export class AuctionEngine {
       currentTeam: this.state.currentTeam,
       status: this.state.status,
       withdrawnTeams: this.state.withdrawnTeams,
+      skippedTeams: this.state.skippedTeams,
       teamPurses: purses,
       timerExpiry: this.state.timerExpiry?.toISOString(),
     });
@@ -329,6 +351,7 @@ export class AuctionEngine {
       currentTeam: this.state.currentTeam,
       status: this.state.status,
       withdrawnTeams: this.state.withdrawnTeams,
+      skippedTeams: this.state.skippedTeams,
       teamPurses: purses,
       timerExpiry: this.state.timerExpiry?.toISOString(),
     };
