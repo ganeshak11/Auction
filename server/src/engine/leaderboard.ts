@@ -1,4 +1,5 @@
 import { prisma } from '../index';
+import { analyzeWithGemini } from './geminiAnalysis';
 
 interface LeaderboardMetrics {
   completeness: number;    // 0-30: squad size relative to max
@@ -69,7 +70,45 @@ export async function calculateLeaderboard(roomId: string) {
     });
   }
 
+  // Run Gemini AI analysis in background (don't block leaderboard)
+  runGeminiAnalysis(roomId, room, results).catch(err =>
+    console.error('Gemini analysis background error:', err)
+  );
+
   return results;
+}
+
+export async function runGeminiAnalysis(roomId: string, room: any, results: any[]) {
+  const teamDataList = results.map(result => {
+    const participant = room.participants.find((p: any) => p.teamName === result.teamName);
+    const teamSquad = room.squads.filter((s: any) => s.teamName === result.teamName);
+    const totalSpent = teamSquad.reduce((sum: number, s: any) => sum + s.price, 0);
+
+    return {
+      teamName: result.teamName,
+      ownerName: participant?.user?.name || result.teamName,
+      squad: teamSquad.map((s: any) => ({
+        playerName: s.player.name,
+        role: s.player.role,
+        country: s.player.country,
+        isOverseas: s.player.isOverseas,
+        basePrice: s.player.basePrice,
+        boughtPrice: s.price,
+      })),
+      totalSpent,
+      purseRemaining: room.purse - totalSpent,
+      totalPurse: room.purse,
+      metrics: result.metrics,
+    };
+  });
+
+  const analysis = await analyzeWithGemini(teamDataList);
+  if (analysis) {
+    await prisma.room.update({
+      where: { id: roomId },
+      data: { aiAnalysis: analysis as any },
+    });
+  }
 }
 
 function calculateMetrics(

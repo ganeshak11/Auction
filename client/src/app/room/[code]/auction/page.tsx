@@ -54,6 +54,7 @@ export default function AuctionPage() {
   const [soldNotification, setSoldNotification] = useState<any>(null);
   const [unsoldNotification, setUnsoldNotification] = useState<any>(null);
   const [squads, setSquads] = useState<Record<string, any[]>>({});
+  const [teamToName, setTeamToName] = useState<Record<string, string>>({});
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const bidHistoryRef = useRef<HTMLDivElement>(null);
@@ -67,6 +68,13 @@ export default function AuctionPage() {
 
       const participant = data.room.participants.find((p: any) => p.userId === user?.id);
       if (participant) setMyTeam(participant.teamName);
+
+      // Build teamName → participant display name mapping
+      const nameMap: Record<string, string> = {};
+      for (const p of data.room.participants) {
+        nameMap[p.teamName] = p.user?.name || p.teamName;
+      }
+      setTeamToName(nameMap);
 
       // Build squads from existing data
       const squadMap: Record<string, any[]> = {};
@@ -230,7 +238,7 @@ export default function AuctionPage() {
             <div className="flex items-center gap-3">
               <span className="text-lg">{TEAM_LOGOS[myTeam]}</span>
               <div className="text-right">
-                <p className="text-sm font-bold">{myTeam}</p>
+                <p className="text-sm font-bold">{teamToName[myTeam] || myTeam}</p>
                 <p className="text-xs text-accent font-mono">{formatPrice(myPurse)}</p>
               </div>
             </div>
@@ -258,7 +266,7 @@ export default function AuctionPage() {
             <p className="text-xl font-bold mb-1">{soldNotification.player?.name}</p>
             <p className="text-lg">
               <span className="text-text-muted">to</span>{' '}
-              <span className="font-bold">{TEAM_LOGOS[soldNotification.teamName]} {soldNotification.teamName}</span>
+              <span className="font-bold">{TEAM_LOGOS[soldNotification.teamName]} {teamToName[soldNotification.teamName] || soldNotification.teamName}</span>
             </p>
             <p className="text-2xl font-black text-accent mt-2">{formatPrice(soldNotification.price)}</p>
           </div>
@@ -337,7 +345,7 @@ export default function AuctionPage() {
                         <span className="text-xl">{TEAM_LOGOS[auctionState.currentTeam]}</span>
                         <div>
                           <p className="text-xs text-text-muted">Highest Bid</p>
-                          <p className="font-bold">{auctionState.currentTeam} — {formatPrice(auctionState.currentPrice)}</p>
+                          <p className="font-bold">{teamToName[auctionState.currentTeam] || auctionState.currentTeam} — {formatPrice(auctionState.currentPrice)}</p>
                         </div>
                       </div>
                     )}
@@ -465,7 +473,7 @@ export default function AuctionPage() {
                     >
                       <div className="flex items-center gap-2">
                         <span>{TEAM_LOGOS[bid.teamName] || '🏏'}</span>
-                        <span className="font-semibold text-sm">{bid.teamName}</span>
+                        <span className="font-semibold text-sm">{teamToName[bid.teamName] || bid.teamName}</span>
                       </div>
                       <div className="text-right">
                         <span className="font-bold text-sm">{formatPrice(bid.amount)}</span>
@@ -498,7 +506,7 @@ export default function AuctionPage() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm">{TEAM_LOGOS[team]}</span>
                         <span className={`text-sm font-semibold ${team === myTeam ? 'text-primary-light' : ''}`}>
-                          {team}
+                          {teamToName[team] || team}
                         </span>
                       </div>
                       <span className="text-sm font-mono">{formatPrice(purse as number)}</span>
@@ -511,7 +519,7 @@ export default function AuctionPage() {
             {myTeam && squads[myTeam] && squads[myTeam].length > 0 && (
               <div className="glass-card fade-in">
                 <h3 className="text-sm font-bold text-text-muted mb-3 uppercase tracking-wider">
-                  {TEAM_LOGOS[myTeam]} {myTeam} Squad ({squads[myTeam].length})
+                  {TEAM_LOGOS[myTeam]} {teamToName[myTeam] || myTeam} Squad ({squads[myTeam].length})
                 </h3>
                 <div className="space-y-2">
                   {squads[myTeam].map((s: any, i: number) => (
@@ -556,6 +564,7 @@ export default function AuctionPage() {
                 </h3>
                 <div className="space-y-4 max-h-[500px] overflow-y-auto pr-1">
                   {Object.entries(squads)
+                    .filter(([teamName]) => teamName !== myTeam)
                     .sort(([a], [b]) => a.localeCompare(b))
                     .map(([teamName, members]) => {
                       if (!members || members.length === 0) return null;
@@ -563,7 +572,7 @@ export default function AuctionPage() {
                         <div key={teamName}>
                           <h4 className="text-xs font-bold uppercase tracking-wider mb-2 px-1 flex items-center gap-1.5">
                             <span>{TEAM_LOGOS[teamName] || '🏏'}</span>
-                            <span>{teamName}</span>
+                            <span>{teamToName[teamName] || teamName}</span>
                             <span className="text-text-muted font-normal">({members.length})</span>
                           </h4>
                           {(['BAT', 'WK', 'AR', 'BOWL'] as const).map(role => {

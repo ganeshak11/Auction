@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../index';
-import { calculateLeaderboard } from '../engine/leaderboard';
+import { calculateLeaderboard, runGeminiAnalysis } from '../engine/leaderboard';
 
 export const auctionRouter = Router();
 
@@ -75,11 +75,23 @@ auctionRouter.get('/:roomId/results', async (req: Request, res: Response) => {
     // If results don't exist yet, calculate them
     if (room.results.length === 0 && room.status === 'COMPLETED') {
       const results = await calculateLeaderboard(room.id);
-      res.json({ results, squads: room.squads });
+      res.json({ results, squads: room.squads, aiAnalysis: null });
       return;
     }
 
-    res.json({ results: room.results, squads: room.squads });
+    // Attempt to retry AI analysis if it failed previously
+    if (room.results.length > 0 && room.status === 'COMPLETED' && !room.aiAnalysis) {
+      console.log('Retrying missing AI analysis for room:', room.id);
+      runGeminiAnalysis(room.id, room, room.results).catch((err: any) =>  
+        console.error('Gemini retry failed:', err)
+      );
+    }
+
+    res.json({
+      results: room.results,
+      squads: room.squads,
+      aiAnalysis: room.aiAnalysis || null,
+    });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get results' });
   }
